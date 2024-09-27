@@ -5,9 +5,21 @@ using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Controls.Shapes;
 
 namespace UABEAvalonia
 {
+    /*
+     * Ubuntu:
+    edit file UABEAvalonia/UABEAvalonia.csproj:
+
+    <OutputType>Exe</OutputType>
+	<RuntimeIdentifier>linux-x64</RuntimeIdentifier>
+
+    compile:
+    dotnet publish -c Release -r linux-x64 --self-contained
+    */
+
     class Program
     {
         //https://stackoverflow.com/a/37146916
@@ -50,7 +62,10 @@ namespace UABEAvalonia
             {
                 if (usesConsole)
                     CommandLineHandler.PrintHelp();
-                BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+                try
+                {
+                    BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+                } catch { }
             }
         }
 
