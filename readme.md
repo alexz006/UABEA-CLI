@@ -10,6 +10,33 @@
 
 Cross-platform Asset Bundle/Serialized File reader and writer. Originally based on (but not a fork of) [UABE](https://github.com/SeriousCache/UABE).
 
+## Command line
+
+```
+WARNING: Command line support VERY EARLY
+There is a high chance of stuff breaking
+Use at your own risk
+
+  UABEAvalonia batchexportbundle <directory>
+  UABEAvalonia batchimportbundle <directory>
+  UABEAvalonia applyemip <emip file> <directory>
+  UABEAvalonia exportdumps <bundle file> [-<containerName1> -<containerName2> ...]
+  UABEAvalonia importdumps <bundle file>
+
+Bundle import/export arguments:
+  -keepnames writes out to the exact file name in the bundle.
+      Normally, file names are prepended with the bundle's name.
+      Note: these names are not compatible with batchimport.
+  -kd keep .decomp files. When UABEA opens compressed bundles,
+      they are decompressed into .decomp files. If you want to
+      decompress bundles, you can use this flag to keep them
+      without deleting them.
+  -fd overwrite old .decomp files.
+  -md decompress into memory. Doesn't write .decomp files.
+      -kd and -fd won't do anything with this flag set.
+```
+
+
 ## Extracting assets
 
 I develop UABEA as more of a modding/research tool than an extracting tool. Use [AssetRipper](https://github.com/AssetRipper/AssetRipper) or [AssetStudio](https://github.com/Perfare/AssetStudio/) if you only want to extract assets.
