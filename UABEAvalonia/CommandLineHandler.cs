@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Text.RegularExpressions;
+using Path = System.IO.Path;
 
 namespace UABEAvalonia
 {
@@ -12,28 +13,37 @@ namespace UABEAvalonia
     {
         public static void PrintHelp()
         {
-            Console.WriteLine("UABE AVALONIA");
-            Console.WriteLine("WARNING: Command line support VERY EARLY");
+            Console.WriteLine("\u001b[1mUABE AVALONIA");
+            Console.WriteLine("\u001b[0mWARNING: Command line support VERY EARLY");
             Console.WriteLine("There is a high chance of stuff breaking");
             Console.WriteLine("Use at your own risk");
-            Console.WriteLine("");
+            Console.WriteLine("\u001b[1m");
             Console.WriteLine("  UABEAvalonia batchexportbundle <directory>");
             Console.WriteLine("  UABEAvalonia batchimportbundle <directory>");
             Console.WriteLine("  UABEAvalonia applyemip <emip file> <directory>");
-            Console.WriteLine("  UABEAvalonia exportdumps <bundle file> [-<containerName1> -<containerName2> ...]");
-            Console.WriteLine("  UABEAvalonia importdumps <bundle file>");
             Console.WriteLine("");
+            Console.WriteLine("  UABEAvalonia exportdumps <bundle file> [-all or -<containerName1> -<containerName2> ...]");
+            Console.WriteLine("  UABEAvalonia importdumps <bundle file> [-lz4 or -lzma] [-del]");
+            Console.WriteLine("\u001b[0m");
             Console.WriteLine("Bundle import/export arguments:");
-            Console.WriteLine("  -keepnames writes out to the exact file name in the bundle.");
+            Console.WriteLine("  \u001b[1m-keepnames \u001b[0mwrites out to the exact file name in the bundle.");
             Console.WriteLine("      Normally, file names are prepended with the bundle's name.");
             Console.WriteLine("      Note: these names are not compatible with batchimport.");
-            Console.WriteLine("  -kd keep .decomp files. When UABEA opens compressed bundles,");
+            Console.WriteLine("  \u001b[1m-kd \u001b[0mkeep .decomp files. When UABEA opens compressed bundles,");
             Console.WriteLine("      they are decompressed into .decomp files. If you want to");
             Console.WriteLine("      decompress bundles, you can use this flag to keep them");
             Console.WriteLine("      without deleting them.");
-            Console.WriteLine("  -fd overwrite old .decomp files.");
-            Console.WriteLine("  -md decompress into memory. Doesn't write .decomp files.");
+            Console.WriteLine("  \u001b[1m-fd \u001b[0moverwrite old .decomp files.");
+            Console.WriteLine("  \u001b[1m-md \u001b[0mdecompress into memory. Doesn't write .decomp files.");
             Console.WriteLine("      -kd and -fd won't do anything with this flag set.");
+            Console.WriteLine("");
+            Console.WriteLine("Dumps export arguments:");
+            Console.WriteLine("  \u001b[1m-all \u001b[0mexports all assets in the bundle.");
+            Console.WriteLine("  \u001b[1m-<containerName> \u001b[0mexports assets with names containing <containerName>.");
+            Console.WriteLine("Dumps import arguments:");
+            Console.WriteLine("  \u001b[1m-lz4 \u001b[0mcompresses the bundle with LZ4.");
+            Console.WriteLine("  \u001b[1m-lzma \u001b[0mcompresses the bundle with LZMA.");
+            Console.WriteLine("  \u001b[1m-del \u001b[0mdeletes all dumped files after importing.");
         }
 
         private static string GetMainFileName(string[] args)
@@ -87,6 +97,46 @@ namespace UABEAvalonia
             }
 
             return bun;
+        }
+
+        private static void CompressBundle(string path, string compType = "lz4"/*lzma*/)
+        {
+            AssetBundleCompressionType assetBundleCompressionType = AssetBundleCompressionType.None;
+
+            if (compType == "lz4")
+            {
+                assetBundleCompressionType = AssetBundleCompressionType.LZ4;
+            }
+            else if (compType == "lzma")
+            {
+                assetBundleCompressionType = AssetBundleCompressionType.LZMA;
+            }
+
+            if (assetBundleCompressionType != AssetBundleCompressionType.None)
+            {
+                Console.WriteLine("Compress bundle...");
+
+                string tempPath = path + ".temp_";
+
+                if (File.Exists(tempPath))
+                {
+                    File.Delete(tempPath);
+                }
+
+                File.Move(path, tempPath);
+
+                BundleFileInstance bundleInst = am.LoadBundleFile(tempPath, false);
+
+                using (FileStream fs = File.Open(path, FileMode.Create))
+                using (AssetsFileWriter w = new AssetsFileWriter(fs))
+                {
+                    bundleInst.file.Pack(bundleInst.file.Reader, w, assetBundleCompressionType, true);
+                }
+
+                bundleInst.file.Reader.Close();
+
+                File.Delete(tempPath);
+            }
         }
 
         private static string GetNextBackup(string affectedFilePath)
@@ -378,7 +428,7 @@ namespace UABEAvalonia
             {
                 BatchExportAndDumpByName(args);
             }
-            else if (command == "importdumps") // importdumps C:\Users\User\source\repos\UABEA-7\ReleaseFiles\modelist.bundle
+            else if (command == "importdumps") // importdumps C:\Users\User\source\repos\UABEA-7\ReleaseFiles\modelist.bundle -lz4
             {
                 BatchImportDumpToBundle(args);
             }
@@ -390,11 +440,19 @@ namespace UABEAvalonia
 
 
 
+
+
+
+
+
+
         private static bool isDumped = false;
         private static bool needSave = false;
         public static List<string> dumpByNames = new List<string>();
         public static List<string> allTxt = new List<string>();
-        public static AssetWorkspace? Workspace { get; private set; }
+
+        public static AssetWorkspace? aWorkspace { get; private set; }
+
         public static AssetsManager am { get; private set; }
         private static ObservableCollection<AssetInfoDataGridItem> dataGridItems;
         public static List<Tuple<AssetsFileInstance, byte[]>> ChangedAssetsDatas { get; set; }
@@ -418,9 +476,9 @@ namespace UABEAvalonia
 
             //Console.WriteLine("Loaded file: " + fileInst.path);
 
-            Workspace = new AssetWorkspace(am, false);
+            aWorkspace = new AssetWorkspace(am, false);
 
-            Workspace.LoadAssetsFile(fileInst, true);
+            aWorkspace.LoadAssetsFile(fileInst, true);
 
             if (!SetupContainers())
             {
@@ -446,27 +504,27 @@ namespace UABEAvalonia
         // настройка контейнеров
         private static bool SetupContainers()
         {
-            if (Workspace == null || Workspace.LoadedFiles.Count == 0)
+            if (aWorkspace == null || aWorkspace.LoadedFiles.Count == 0)
             {
                 return false;
             }
 
             UnityContainer ucont = new UnityContainer();
-            foreach (AssetsFileInstance file in Workspace.LoadedFiles)
+            foreach (AssetsFileInstance file in aWorkspace.LoadedFiles)
             {
                 AssetsFileInstance? actualFile;
                 AssetTypeValueField? ucontBaseField;
-                if (UnityContainer.TryGetBundleContainerBaseField(Workspace, file, out actualFile, out ucontBaseField))
+                if (UnityContainer.TryGetBundleContainerBaseField(aWorkspace, file, out actualFile, out ucontBaseField))
                 {
                     ucont.FromAssetBundle(am, actualFile, ucontBaseField);
                 }
-                else if (UnityContainer.TryGetRsrcManContainerBaseField(Workspace, file, out actualFile, out ucontBaseField))
+                else if (UnityContainer.TryGetRsrcManContainerBaseField(aWorkspace, file, out actualFile, out ucontBaseField))
                 {
                     ucont.FromResourceManager(am, actualFile, ucontBaseField);
                 }
             }
 
-            foreach (var asset in Workspace.LoadedAssets)
+            foreach (var asset in aWorkspace.LoadedAssets)
             {
                 AssetPPtr pptr = new AssetPPtr(asset.Key.fileName, 0, asset.Key.pathID);
                 string? path = ucont.GetContainerPath(pptr);
@@ -484,14 +542,14 @@ namespace UABEAvalonia
         {
             dataGridItems = new ObservableCollection<AssetInfoDataGridItem>();
 
-            if (Workspace == null || Workspace.LoadedFiles.Count == 0)
+            if (aWorkspace == null || aWorkspace.LoadedFiles.Count == 0)
             {
                 return dataGridItems;
             }
 
-            Workspace.GenerateAssetsFileLookup();
+            aWorkspace.GenerateAssetsFileLookup();
 
-            foreach (AssetContainer cont in Workspace.LoadedAssets.Values)
+            foreach (AssetContainer cont in aWorkspace.LoadedAssets.Values)
             {
                 AddDataGridItem(cont);
             }
@@ -559,8 +617,14 @@ namespace UABEAvalonia
             foreach (string flag in flags)
             {
                 string dumpByName = flag.Replace("-", "");
+                if (dumpByName == "all")
+                {
+                    dumpByNames.RemoveRange(0, dumpByNames.Count);
+                    dumpByNames.Add("all");
+                    break;
+                }
                 dumpByNames.Add(dumpByName);
-                Console.WriteLine($"Dump: {dumpByName}");
+                //Console.WriteLine($"Dump: {dumpByName}");
             }
 
             // удалить все после последней точки в имени файла
@@ -586,12 +650,12 @@ namespace UABEAvalonia
             string modified;
 
             container = cont.Container;
-            fileId = Workspace.LoadedFiles.IndexOf(thisFileInst);
+            fileId = aWorkspace.LoadedFiles.IndexOf(thisFileInst);
             pathId = cont.PathId;
             size = (int)cont.Size;
             modified = "";
 
-            AssetNameUtils.GetDisplayNameFast(Workspace, cont, true, out name, out type);
+            AssetNameUtils.GetDisplayNameFast(aWorkspace, cont, true, out name, out type);
 
             if (name.Length > 100)
                 name = name[..100];
@@ -622,7 +686,7 @@ namespace UABEAvalonia
             // если в item.Name содержится dumpByNames
             foreach (string dumpByName in dumpByNames)
             {
-                if (dumpByName != null && item.Name.Contains(dumpByName))
+                if (dumpByName == "all" || item.Name.Contains(dumpByName))
                 {
                     SingleExportDump(item.Name, cont, thisFileInst);
                     isDumped = true;
@@ -637,19 +701,18 @@ namespace UABEAvalonia
                 string pattern = @"-(?<hash>[a-f0-9]+)-(?<name>[^-]+)-(?<suffix>-?\d+)";
                 var match = Regex.Match(fileTxt, pattern);
 
-                isDumped = true;
-
                 if (match.Success)
                 {
                     //string fHash = match.Groups["hash"].Value; // "ce8a676bf4c36383835289e02833cef7"
-                    //string fName = match.Groups["name"].Value; // "TextMeshProUGUI"
+                    string fName = match.Groups["name"].Value; // "TextMeshProUGUI"
                     long fId = long.Parse(match.Groups["suffix"].Value); // -5415249613762791440
 
                     if (fId == pathId)
                     {
                         SingleImportDump(fileTxt, cont, thisFileInst);
                         needSave = true;
-
+                        
+                        Console.WriteLine($"Import Dump: {fName}-{pathId}");
                     }
                 }
             }
@@ -665,7 +728,7 @@ namespace UABEAvalonia
             using (FileStream fs = File.Open(selectedFilePath, FileMode.Create))
             using (StreamWriter sw = new StreamWriter(fs))
             {
-                AssetTypeValueField? baseField = Workspace.GetBaseField(selectedCont);
+                AssetTypeValueField? baseField = aWorkspace.GetBaseField(selectedCont);
 
                 if (baseField == null)
                 {
@@ -679,6 +742,8 @@ namespace UABEAvalonia
                     dumper.DumpJsonAsset(sw, baseField);
                 else //if (extension == "txt")
                     dumper.DumpTextAsset(sw, baseField);
+
+                Console.WriteLine($"Export Dump: {name}-{selectedCont.PathId}");
             }
         }
 
@@ -688,6 +753,7 @@ namespace UABEAvalonia
         // импорт в бандл
         private static void BatchImportDumpToBundle(string[] args)
         {
+            isDumped = true;
             string fileCAB = "";
 
             string file = GetMainFileName(args);
@@ -696,6 +762,19 @@ namespace UABEAvalonia
                 Console.WriteLine("File does not exist!");
                 return;
             }
+
+            HashSet<string> flags = GetFlags(args);
+            string compType = ""; // lz4 or lzma
+            bool delall = false;
+
+            if (flags.Contains("-lz4"))
+                compType = "lz4";
+            else if (flags.Contains("-lzma"))
+                compType = "lzma";
+
+            if (flags.Contains("-del"))
+                delall = true;
+
 
             string[] files = Directory.GetFiles(Path.GetDirectoryName(file), $"{Path.GetFileName(file)}_CAB-*");
 
@@ -707,7 +786,6 @@ namespace UABEAvalonia
                 if (ext.Contains("txt"))
                 {
                     allTxt.Add(f);
-                    //Console.WriteLine(f);
                 }
                 else if (ext.Contains("_CAB-"))
                 {
@@ -725,7 +803,33 @@ namespace UABEAvalonia
             PrepareWorkspace(fileCAB);
             MakeDataGridItems(); // создание элементов таблицы данных и импорт дампов в Assets
 
-            BatchImportSingleBundle(file);
+            BatchImportSingleBundle(file, compType);
+
+            if (delall)
+            {
+                am.UnloadAllAssetsFiles(true);
+                am.UnloadAllBundleFiles();
+
+                foreach (string f in files)
+                {
+                    string ext = Path.GetExtension(f);
+
+                    // если в имени файта есть txt
+                    if (ext.Contains("txt"))
+                    {
+                        File.Delete(f);
+                    }
+                }
+
+                // fileCAB
+                File.Delete(fileCAB);
+                if (File.Exists(fileCAB + ".resS"))
+                    File.Delete(fileCAB + ".resS");
+
+                Console.WriteLine("Deleted all dumped files.");
+            }
+
+            Console.WriteLine("Done.");
         }
 
         // импорт дампа
@@ -741,7 +845,7 @@ namespace UABEAvalonia
                 string? exceptionMessage = null;
                 if (file.EndsWith(".json"))
                 {
-                    AssetTypeTemplateField tempField = Workspace.GetTemplateField(selectedCont);
+                    AssetTypeTemplateField tempField = aWorkspace.GetTemplateField(selectedCont);
                     bytes = importer.ImportJsonAsset(tempField, sr, out exceptionMessage);
                 }
                 else
@@ -757,7 +861,7 @@ namespace UABEAvalonia
                 }
 
                 AssetsReplacer replacer = AssetImportExport.CreateAssetReplacer(selectedCont, bytes);
-                Workspace.AddReplacer(selectedInst, replacer, new MemoryStream(bytes));
+                aWorkspace.AddReplacer(selectedInst, replacer, new MemoryStream(bytes));
             }
         }
 
@@ -765,15 +869,15 @@ namespace UABEAvalonia
         private static void SaveAssetsFile()
         {
             var fileToReplacer = new Dictionary<AssetsFileInstance, List<AssetsReplacer>>();
-            var changedFiles = Workspace.GetChangedFiles();
+            var changedFiles = aWorkspace.GetChangedFiles();
 
-            foreach (var newAsset in Workspace.NewAssets)
+            foreach (var newAsset in aWorkspace.NewAssets)
             {
                 AssetID assetId = newAsset.Key;
                 AssetsReplacer replacer = newAsset.Value;
                 string fileName = assetId.fileName;
 
-                if (Workspace.LoadedFileLookup.TryGetValue(fileName.ToLower(), out AssetsFileInstance? file))
+                if (aWorkspace.LoadedFileLookup.TryGetValue(fileName.ToLower(), out AssetsFileInstance? file))
                 {
                     if (!fileToReplacer.ContainsKey(file))
                         fileToReplacer[file] = new List<AssetsReplacer>();
@@ -783,7 +887,7 @@ namespace UABEAvalonia
             }
 
             // false
-            if (Workspace.fromBundle)
+            if (aWorkspace.fromBundle)
             {
                 ChangedAssetsDatas.Clear();
                 foreach (var file in changedFiles)
@@ -850,7 +954,7 @@ namespace UABEAvalonia
                         file.file.Read(new AssetsFileReader(File.OpenRead(origFilePath)));
                         file.file.GenerateQuickLookup();
 
-                        changedFileIds.Add(Workspace.LoadedFiles.IndexOf(file));
+                        changedFileIds.Add(aWorkspace.LoadedFiles.IndexOf(file));
                     }
                     catch (Exception ex)
                     {
@@ -864,15 +968,16 @@ namespace UABEAvalonia
                     int fileId = item.FileID;
                     if (changedFileIds.Contains(fileId))
                     {
-                        item.assetContainer.SetNewFile(Workspace.LoadedFiles[fileId]);
+                        item.assetContainer.SetNewFile(aWorkspace.LoadedFiles[fileId]);
                     }
                 }
             }
         }
 
         // импорт данных в бандл
-        private static void BatchImportSingleBundle(string file)
+        private static void BatchImportSingleBundle(string file, string compType = "")
         {
+
             if (!File.Exists(file))
             {
                 Console.WriteLine("File does not exist!");
@@ -921,7 +1026,9 @@ namespace UABEAvalonia
             if (File.Exists(decompFile))
                 File.Delete(decompFile);
 
-            Console.WriteLine("Done.");
+            CompressBundle(file, compType);
         }
+        
+
     }
 }
