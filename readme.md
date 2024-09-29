@@ -13,6 +13,7 @@ Cross-platform Asset Bundle/Serialized File reader and writer. Originally based 
 ## Command line
 
 ```
+UABE AVALONIA
 WARNING: Command line support VERY EARLY
 There is a high chance of stuff breaking
 Use at your own risk
@@ -20,8 +21,9 @@ Use at your own risk
   UABEAvalonia batchexportbundle <directory>
   UABEAvalonia batchimportbundle <directory>
   UABEAvalonia applyemip <emip file> <directory>
-  UABEAvalonia exportdumps <bundle file> [-<containerName1> -<containerName2> ...]
-  UABEAvalonia importdumps <bundle file>
+
+  UABEAvalonia exportdumps <bundle file> [-all or -<containerName1> -<containerName2> ...]
+  UABEAvalonia importdumps <bundle file> [-lz4 or -lzma] [-del]
 
 Bundle import/export arguments:
   -keepnames writes out to the exact file name in the bundle.
@@ -34,6 +36,14 @@ Bundle import/export arguments:
   -fd overwrite old .decomp files.
   -md decompress into memory. Doesn't write .decomp files.
       -kd and -fd won't do anything with this flag set.
+
+Dumps export arguments:
+  -all exports all assets in the bundle.
+  -<containerName> exports assets with names containing <containerName>.
+Dumps import arguments:
+  -lz4 compresses the bundle with LZ4.
+  -lzma compresses the bundle with LZMA.
+  -del deletes all dumped files after importing.
 ```
 
 
