@@ -627,9 +627,11 @@ namespace UABEAvalonia
                 //Console.WriteLine($"Dump: {dumpByName}");
             }
 
-            // удалить все после последней точки в имени файла
-            if(entryCount > 1)
-                outName = outName.Substring(0, outName.LastIndexOf('.'));
+            // удалить из имени лишнее
+            string fileDir = Path.GetDirectoryName(outName);
+            string fileName = Path.GetFileName(outName);
+            string[] parts = fileName.Split(new[] { '.' });
+            outName = Path.Combine(fileDir, parts[0] + "." + parts[1]);
             
             PrepareWorkspace(outName);
 
