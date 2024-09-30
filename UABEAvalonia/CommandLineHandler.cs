@@ -628,7 +628,9 @@ namespace UABEAvalonia
             }
 
             // удалить все после последней точки в имени файла
-            outName = outName.Substring(0, outName.LastIndexOf('.'));
+            if(entryCount > 1)
+                outName = outName.Substring(0, outName.LastIndexOf('.'));
+            
             PrepareWorkspace(outName);
 
             MakeDataGridItems();
