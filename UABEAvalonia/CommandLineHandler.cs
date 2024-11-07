@@ -702,7 +702,7 @@ namespace UABEAvalonia
                 // fileTxt = modelist.bundle_CAB-ce8a676bf4c36383835289e02833cef7-TextMeshProUGUI--5415249613762791440.txt
 
                 // Регулярное выражение для извлечения частей
-                string pattern = @"-(?<hash>[a-f0-9]+)-(?<name>[^-]+)-(?<suffix>-?\d+)";
+                string pattern = @"_CAB-(?<hash>[a-f0-9]+)-(?<name>[^-]+)-(?<suffix>-?\d+)";
                 var match = Regex.Match(fileTxt, pattern);
 
                 if (match.Success)
